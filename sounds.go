@@ -12,15 +12,15 @@ import (
 const (
 	OneMin          = 60
 	FiveMin         = OneMin * 5
-	OneMinSoundLoc  = "./1minute.mp3"
-	FiveMinSoundLoc = "./5minutes.mp3"
+	OneMinSoundLoc  = "resources/1minute.mp3"
+	FiveMinSoundLoc = "resources/5minutes.mp3"
 )
 
 type Foley struct {
 	soundPlayer *oto.Player
 }
 
-func (f *Foley) playSound(fileLocation string, newContext bool) error {
+func (f *Foley) playSound(fileLocation string) error {
 	file, err := os.Open(fileLocation)
 	if err != nil {
 		return err
@@ -31,7 +31,7 @@ func (f *Foley) playSound(fileLocation string, newContext bool) error {
 	if err != nil {
 		return err
 	}
-	if newContext {
+	if f.soundPlayer == nil {
 		f.soundPlayer, err = oto.NewPlayer(d.SampleRate(), 2, 2, 8192)
 		if err != nil {
 			return err
@@ -57,12 +57,12 @@ func (f *Foley) checkForImportantTimeRemainingEvents(secondsLeft int64) {
 	if secondsLeft == FiveMin {
 		go func() {
 			log.Println("play 5 min sound")
-			f.playSound(FiveMinSoundLoc, true)
+			f.playSound(FiveMinSoundLoc)
 		}()
 	} else if secondsLeft == OneMin {
 		go func() {
 			log.Println("play 1 min sound")
-			f.playSound(OneMinSoundLoc, false)
+			f.playSound(OneMinSoundLoc)
 		}()
 	}
 }
