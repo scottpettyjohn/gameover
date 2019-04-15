@@ -12,8 +12,8 @@ import (
 const (
 	OneMin          = 60
 	FiveMin         = OneMin * 5
-	OneMinSoundLoc  = "resources/1minute.mp3"
-	FiveMinSoundLoc = "resources/5minutes.mp3"
+	OneMinSoundLoc  = "./1minute.mp3"
+	FiveMinSoundLoc = "./5minutes.mp3"
 )
 
 type Foley struct {
