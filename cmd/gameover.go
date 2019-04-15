@@ -33,7 +33,7 @@ func main() {
 	log.Println("ready player 1.")
 	router := mux.NewRouter()
 	router.HandleFunc("/play", StartPlaySession).Methods("POST")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Fatal(http.ListenAndServe(":8888", router))
 
 }
 
