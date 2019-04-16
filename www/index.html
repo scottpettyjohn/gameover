@@ -1,0 +1,19 @@
+<html>
+<head></head>
+<body>
+<h1>Events:</h1>
+<div id="event"></div>
+<script type="text/javascript">
+    var event = document.getElementById("event");
+    var socket = new WebSocket("ws://macbook1:8888/ws");
+
+    var update = function() {
+        socket.onmessage = function (e) {
+            event.textContent = e.data;
+        }
+    };
+
+    window.setTimeout(update)
+</script>
+</body>
+</html>

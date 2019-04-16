@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/scottpettyjohn/gameover"
-	"github.com/stianeikeland/go-rpio"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -22,22 +21,32 @@ func (ps PlaySession) parseDuration() time.Duration {
 }
 
 var (
+	gameMaster     *gameover.GameMaster
 	gameRequestCh  chan gameover.GameRequest  = make(chan gameover.GameRequest)
 	gameResponseCh chan gameover.GameResponse = make(chan gameover.GameResponse)
+	upgrader                                  = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 )
 
 func main() {
 
-	gOver := gameover.Init(gameRequestCh, gameResponseCh)
-	gOver.Register(&gameover.Foley{})
+	gameMaster = gameover.Init(gameRequestCh, gameResponseCh)
+	gameMaster.Register(&gameover.Foley{})
 	log.Println("ready player 1.")
 	router := mux.NewRouter()
-	router.HandleFunc("/play", StartPlaySession).Methods("POST")
+	router.HandleFunc("/play", startPlaySessionHandler).Methods("POST")
+	router.HandleFunc("/ws", wsHandler)
+	router.Handle("/", http.StripPrefix("", http.FileServer(http.Dir("www"))))
 	log.Fatal(http.ListenAndServe(":8888", router))
 
 }
 
-func StartPlaySession(w http.ResponseWriter, r *http.Request) {
+func startPlaySessionHandler(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	fmt.Println(string(body))
 	var playSession PlaySession
@@ -58,10 +67,11 @@ func StartPlaySession(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "Response: %t %s", gameResponse.Ok, gameResponse.Message)
 }
 
-func startPlaySession(playSession PlaySession) {
-	if err := rpio.Open(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+func wsHandler(w http.ResponseWriter, r *http.Request) {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		return
 	}
-	defer rpio.Close()
+	gameMaster.Register(gameover.NewWebSocketClient(ws, gameMaster))
 }
