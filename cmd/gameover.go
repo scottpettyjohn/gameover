@@ -22,9 +22,9 @@ func (ps PlaySession) parseDuration() time.Duration {
 
 var (
 	gameMaster     *gameover.GameMaster
-	gameRequestCh  chan gameover.GameRequest  = make(chan gameover.GameRequest)
-	gameResponseCh chan gameover.GameResponse = make(chan gameover.GameResponse)
-	upgrader                                  = websocket.Upgrader{
+	gameRequestCh  = make(chan gameover.GameRequest)
+	gameResponseCh = make(chan gameover.GameResponse)
+	upgrader       = websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
@@ -54,9 +54,9 @@ func startPlaySessionHandler(w http.ResponseWriter, r *http.Request) {
 
 	sessionDuration, err := time.ParseDuration(playSession.Duration)
 	if err != nil {
-		log.Println("failed to create game session %s", err)
+		log.Printf("failed to create game session %s", err)
 		w.WriteHeader(400)
-		fmt.Fprintf(w, "error: %s", err)
+		_, _ = fmt.Fprintf(w, "error: %s", err)
 		return
 	}
 	session := gameover.GameSession{
