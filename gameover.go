@@ -144,8 +144,8 @@ func (g *GameMaster) Deregister(o Observer) {
 
 func (g *GameMaster) Notify(e Event) {
 	for o := range g.observers {
-		go func() {
-			o.OnNotify(e)
-		}()
+		//go func() {
+		o.OnNotify(e)
+		//}()
 	}
 }
