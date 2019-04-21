@@ -9,7 +9,7 @@ export class SocketService {
   private listener: EventEmitter<any> = new EventEmitter();
 
   constructor() {
-    this.socket = new WebSocket('ws://localhost:8888/ws');
+    this.socket = new WebSocket('ws://pjohn.dyns.org:8888/ws');
     this.socket.onopen = event => {
       this.listener.emit({'type': 'open', 'data': event});
     }
