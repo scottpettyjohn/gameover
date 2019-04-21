@@ -41,9 +41,11 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/play", startPlaySessionHandler).Methods("POST")
 	router.HandleFunc("/ws", wsHandler)
-	router.Handle("/", http.StripPrefix("", http.FileServer(http.Dir("www"))))
-	log.Fatal(http.ListenAndServe(":8888", router))
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./ui/dist/ui/")))
+	s := http.StripPrefix("/home", http.FileServer(http.Dir("./ui/dist/ui/")))
+	router.PathPrefix("/home").Handler(s)
 
+	log.Fatal(http.ListenAndServe(":8888", router))
 }
 
 func startPlaySessionHandler(w http.ResponseWriter, r *http.Request) {
