@@ -7,6 +7,7 @@ const (
 	GamePaused
 	GameEnded
 	TimeRemaining
+	GameExtended
 )
 
 type (

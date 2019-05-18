@@ -40,19 +40,17 @@ func main() {
 	log.Println("ready player 1.")
 	router := mux.NewRouter()
 	router.HandleFunc("/play", startPlaySessionHandler).Methods("POST")
+	router.HandleFunc("/extend", extendPlaySessionHandler).Methods("POST")
 	router.HandleFunc("/ws", wsHandler)
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./ui/")))
-	s := http.StripPrefix("/home", http.FileServer(http.Dir("./ui/")))
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./ui/dist/ui/")))
+	s := http.StripPrefix("/home", http.FileServer(http.Dir("./ui/dist/ui/")))
 	router.PathPrefix("/home").Handler(s)
 
 	log.Fatal(http.ListenAndServe(":8888", router))
 }
 
 func startPlaySessionHandler(w http.ResponseWriter, r *http.Request) {
-	body, _ := ioutil.ReadAll(r.Body)
-	fmt.Println(string(body))
-	var playSession PlaySession
-	_ = json.Unmarshal(body, &playSession)
+	playSession := parsePlaySession(r)
 
 	sessionDuration, err := time.ParseDuration(playSession.Duration)
 	if err != nil {
@@ -67,6 +65,29 @@ func startPlaySessionHandler(w http.ResponseWriter, r *http.Request) {
 	gameRequestCh <- gameover.GameRequest{Session: session}
 	gameResponse := <-gameResponseCh
 	_, _ = fmt.Fprintf(w, "Response: %t %s", gameResponse.Ok, gameResponse.Message)
+}
+
+func extendPlaySessionHandler(w http.ResponseWriter, r *http.Request) {
+	playSession := parsePlaySession(r)
+	extendDuration, err := time.ParseDuration(playSession.Duration)
+	if err != nil {
+		log.Printf("failed to extend game session %s", err)
+		w.WriteHeader(400)
+		_, _ = fmt.Fprintf(w, "error: %s", err)
+		return
+	}
+	extendSession := gameover.GameSession{ExtendSession: true, SessionDuration: extendDuration}
+	gameRequestCh <- gameover.GameRequest{Session: extendSession}
+	gameResponse := <-gameResponseCh
+	_, _ = fmt.Fprintf(w, "Response: %t %s", gameResponse.Ok, gameResponse.Message)
+}
+
+func parsePlaySession(r *http.Request) PlaySession {
+	body, _ := ioutil.ReadAll(r.Body)
+	fmt.Println(string(body))
+	var playSession PlaySession
+	_ = json.Unmarshal(body, &playSession)
+	return playSession
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {

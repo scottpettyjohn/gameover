@@ -3,7 +3,6 @@ package gameover
 import (
 	"fmt"
 	"log"
-	"math"
 	"sync"
 	"time"
 )
@@ -19,16 +18,19 @@ type (
 	}
 
 	GameSession struct {
+		ExtendSession     bool
 		SessionDuration   time.Duration
 		remainingDuration time.Duration
 	}
 
 	GameMaster struct {
-		shutdownChan chan bool
-		powerPlug    Plug
-		gameOnMux    sync.Mutex
-		gameOn       bool
-		observers    map[Observer]struct{}
+		shutdownChan    chan bool
+		powerPlug       Plug
+		gameOnMux       sync.Mutex
+		gameOn          bool
+		observers       map[Observer]struct{}
+		remainingSecMux sync.Mutex
+		remainingTime   time.Duration
 	}
 )
 
@@ -69,8 +71,16 @@ func (g *GameMaster) processGameRequest(request GameRequest) GameResponse {
 	defer g.gameOnMux.Unlock()
 
 	var response GameResponse
-	if g.gameOn {
+	if g.gameOn && !request.Session.ExtendSession {
 		response = GameResponse{Ok: false, Message: "A game is already in progress."}
+	} else if g.gameOn && request.Session.ExtendSession {
+		g.remainingSecMux.Lock()
+		extDuration := request.Session.SessionDuration
+		g.remainingTime = g.remainingTime + extDuration
+		g.remainingSecMux.Unlock()
+		g.Notify(Event{Type: GameExtended, Data: int64(extDuration * time.Second)})
+		response = GameResponse{Ok: true, Message: fmt.Sprintf("The current game has been extended by %s.", extDuration)}
+
 	} else {
 		success, err := g.startGame(request)
 		g.gameOn = success
@@ -87,37 +97,28 @@ func (g *GameMaster) processGameRequest(request GameRequest) GameResponse {
 //
 //
 func (g *GameMaster) startGame(request GameRequest) (bool, error) {
-	session := request.Session
-	session.remainingDuration = session.SessionDuration
-	quitTime := time.Now().Add(session.SessionDuration)
+	g.remainingTime = request.Session.SessionDuration
 	g.powerPlug.On()
 	g.Notify(Event{Type: GameStarted})
 	ticker := time.NewTicker(1 * time.Second)
-	quit := make(chan bool)
 	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				session.remainingDuration = time.Now().Sub(quitTime)
-				remainingInSec := math.Abs(float64(session.remainingDuration / time.Second))
-				g.Notify(Event{Type: TimeRemaining, Data: int64(remainingInSec)})
-			case <-quit:
+		for range ticker.C {
+			g.remainingSecMux.Lock()
+			g.remainingTime = g.remainingTime - time.Second
+			g.remainingSecMux.Unlock()
+			if g.remainingTime > 0 {
+				g.Notify(Event{Type: TimeRemaining, Data: int64(g.remainingTime / time.Second)})
+			} else {
+				g.Notify(Event{Type: TimeRemaining, Data: 0})
 				ticker.Stop()
+				g.powerPlug.Off()
+				g.gameOnMux.Lock()
+				g.gameOn = false
+				g.gameOnMux.Unlock()
+				g.Notify(Event{Type: GameEnded})
 				return
 			}
 		}
-	}()
-
-	go func() {
-		select {
-		case <-time.After(session.SessionDuration):
-			g.powerPlug.Off()
-			g.gameOnMux.Lock()
-			g.gameOn = false
-			g.gameOnMux.Unlock()
-		}
-		quit <- true
-		g.Notify(Event{Type: GameEnded})
 	}()
 
 	return true, nil
@@ -144,8 +145,6 @@ func (g *GameMaster) Deregister(o Observer) {
 
 func (g *GameMaster) Notify(e Event) {
 	for o := range g.observers {
-		//go func(e Event) {
 		o.OnNotify(e)
-		//}(e)
 	}
 }
